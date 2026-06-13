@@ -1,1 +1,544 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Letroso Cross</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:linear-gradient(#1a0033,#660099);min-height:100vh;color:#fff;display:flex;flex-direction:column}header{padding:12px;display:flex;justify-content:space-between;background:rgba(0,0,0,.2)}main{flex:1;padding:16px;max-width:500px;margin:0 auto;width:100%}.question{background:linear-gradient(135deg,#ff00aa,#aa00ff);padding:16px;border-radius:20px;text-align:center;font-weight:900;font-size:20px;margin-bottom:14px}.slots{display:flex;flex-direction:column;gap:8px;align-items:center;margin-bottom:12px;min-height:50px}.slot-row{display:flex;gap:5px}.letter-slot{width:38px;height:38px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900}.letter-slot.filled{background:#ff00aa;border-color:#fff}.wheel-container{position:relative;width:280px;height:280px;margin:10px auto}.wheel-bg{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.1),transparent);border:1px solid rgba(255,255,255,.2)}.letter-btn{position:absolute;width:62px;height:62px;border-radius:50%;background:#fff;color:#660099;font-weight:900;font-size:24px;border:none;box-shadow:0 4px 0 #ccc;display:flex;align-items:center;justify-content:center;touch-action:none}.letter-btn.active{background:#ff00aa;color:#fff;transform:scale(.92)}.current-word{height:40px;display:flex;justify-content:center;gap:3px;margin-bottom:10px}.current-letter{width:32px;height:32px;background:#fff;color:#660099;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900}.controls{display:flex;gap:10px;justify-content:center}.btn{padding:11px 18px;border:none;border-radius:12px;font-weight:800;color:#fff}.btn-hint{background:#ffaa00}.btn-shuffle{background:#00aaff}.found-words{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}.found-word{background:rgba(0,255,136,.2);padding:3px 8px;border-radius:10px;font-size:12px}.level-complete{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center}.level-complete.show{display:flex}.complete-box{background:linear-gradient(135deg,#ff00aa,#aa00ff);padding:28px;border-radius:24px;text-align:center;width:85%;max-width:300px}</style></head><body><header><div>Nível <span id="lv">1</span></div><div>🪙 <span id="cn">50</span></div></header><main><div class="question">Você consegue resolver todos eles?</div><div class="slots" id="slots"></div><div class="current-word" id="cur"></div><div class="wheel-container"><div class="wheel-bg"></div><div id="wheel"></div></div><div class="controls"><button class="btn btn-hint" id="hint">💡 Dica (20)</button><button class="btn btn-shuffle" id="shuf">🔀 Embaralhar</button></div><div class="found-words" id="found"></div></main><div class="level-complete" id="done"><div class="complete-box"><h2>🎉 Perfeito!</h2><p id="txt"></p><button id="next" style="width:100%;padding:14px;background:#fff;color:#aa00ff;font-weight:900;border:none;border-radius:12px;margin-top:12px">PRÓXIMO</button></div></div><script>const L=[{l:"SOL",w:["SOL","LOS","OS"]},{l:"LOBO",w:["LOBO","BOLO","SOLO","BOLA","SOL"]},{l:"CASA",w:["CASA","ASA","SACA"]},{l:"AMOR",w:["AMOR","RAMO","ROMA","MAR"]},{l:"FESTA",w:["FESTA","SETA","TESTA"]},{l:"TRILHA",w:["TRILHA","LIRA","RITA","TIRA"]},{l:"LIVRO",w:["LIVRO","VIRO","RIO"]},{l:"PONTO",w:["PONTO","NOTA","PATO"]},{l:"MAGIA",w:["MAGIA","AMIGA","GAMA"]},{l:"SONHO",w:["SONHO","SONO"]},{l:"VENTO",w:["VENTO","NOVO","VETO"]},{l:"PRAIA",w:["PRAIA","PARA","PIRA"]},{l:"FLORES",w:["FLORES","SOL"]},{l:"MUNDO",w:["MUNDO","MUDO"]},{l:"TEMPO",w:["TEMPO","POTE"]},{l:"LUZES",w:["LUZES","LUZ"]},{l:"CAMPO",w:["CAMPO","POMAR"]},{l:"RISOS",w:["RISOS","RISO"]},{l:"PORTA",w:["PORTA","PRATO"]},{l:"ESTRELA",w:["ESTRELA","LESTE"]}];const E=["BRASIL","FUTURO","AMIGO","FELIZ","CIDADE","NATUREZA"];let lv=+localStorage.lv||1,cn=+localStorage.cn||50,found=[],letters=[],path=[],drag=false;const $=i=>document.getElementById(i);function sv(){localStorage.lv=lv;localStorage.cn=cn}function get(){return lv<=20?L[lv-1]:{l:E[(lv-21)%E.length],w:[E[(lv-21)%E.length].slice(0,4),E[(lv-21)%E.length].slice(0,3)]}}function init(){const d=get();letters=d.l.split('').sort(()=>Math.random()-0.5);$('lv').textContent=lv;$('cn').textContent=cn;found=[];$('found').innerHTML='';$('cur').innerHTML='';$('done').classList.remove('show');const s=$('slots');s.innerHTML='';const r=document.createElement('div');r.className='slot-row';d.w.forEach(w=>{for(let i=0;i<w.length;i++){const e=document.createElement('div');e.className='letter-slot';e.dataset.w=w;e.dataset.p=i;r.appendChild(e)}const sp=document.createElement('div');sp.style.width='8px';r.appendChild(sp)});s.appendChild(r);const wh=$('wheel');wh.innerHTML='';const st=2*Math.PI/letters.length;letters.forEach((c,i)=>{const b=document.createElement('button');b.className='letter-btn';b.textContent=c;const a=i*st-Math.PI/2;b.style.left=140+95*Math.cos(a)-31+'px';b.style.top=140+95*Math.sin(a)-31+'px';wh.appendChild(b)});bind();sv()}function bind(){const w=$('wheel');w.onpointerdown=e=>{const b=e.target.closest('.letter-btn');if(!b)return;drag=true;path=[];add(b);e.preventDefault()};window.onpointermove=e=>{if(!drag)return;const el=document.elementFromPoint(e.clientX,e.clientY);const b=el&&el.closest('.letter-btn');if(b&&!path.includes(b))add(b)};window.onpointerup=()=>{if(!drag)return;drag=false;check();path.forEach(b=>b.classList.remove('active'));path=[];$('cur').innerHTML=''}}function add(b){path.push(b);b.classList.add('active');$('cur').innerHTML=path.map(x=>`<div class="current-letter">${x.textContent}</div>`).join('')}function check(){const w=path.map(b=>b.textContent).join('').toUpperCase(),d=get();if(d.w.includes(w)&&!found.includes(w)){found.push(w);document.querySelectorAll(`[data-w="${w}"]`).forEach((s,i)=>{s.textContent=w[i];s.classList.add('filled')});const t=document.createElement('div');t.className='found-word';t.textContent=w;$('found').appendChild(t);cn+=5;$('cn').textContent=cn;if(navigator.vibrate)navigator.vibrate(20);if(found.length>=d.w.length){setTimeout(()=>{cn+=20;$('txt').textContent=`Nível ${lv} completo! +20 moedas`;$('done').classList.add('show');sv()},400)}}} $('next').onclick=()=>{lv++;init()};$('hint').onclick=()=>{if(cn<20)return alert('Sem moedas');const d=get(),r=d.w.find(x=>!found.includes(x));if(r){cn-=20;$('cn').textContent=cn;const s=document.querySelector(`[data-w="${r}"][data-p="0"]`);if(s){s.textContent=r[0];s.classList.add('filled')}sv()}};$('shuf').onclick=()=>init();init();</script></body></html>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Letroso Cross - Jogo de Palavras</title>
+    <style>
+        * {
+            user-select: none;
+            touch-action: manipulation;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(145deg, #1e2b3c 0%, #0f1a24 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 16px;
+        }
+
+        /* container principal */
+        .game-container {
+            max-width: 550px;
+            width: 100%;
+            background: rgba(255,248,225,0.95);
+            border-radius: 72px 72px 56px 56px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4), inset 0 1px 4px rgba(255,255,200,0.8);
+            padding: 20px 16px 30px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        /* cabeçalho moedas / nível */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2e241f;
+            padding: 10px 20px;
+            border-radius: 60px;
+            color: #ffecb3;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .coins {
+            background: #f5b042;
+            padding: 5px 14px;
+            border-radius: 40px;
+            color: #2d1f0c;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 1.2rem;
+        }
+
+        .level-box {
+            background: #00000066;
+            padding: 5px 14px;
+            border-radius: 30px;
+            font-size: 1rem;
+        }
+
+        /* slots das palavras (quadradinhos roxos) */
+        .word-slots {
+            background: #d9c8b2;
+            border-radius: 48px;
+            padding: 18px 12px;
+            margin: 10px 0 20px;
+            box-shadow: inset 0 0 0 2px #fff6e5, inset 0 0 0 5px #b2956e;
+        }
+
+        .slot-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .slot-word {
+            background: #7d5d42;
+            padding: 6px 10px;
+            border-radius: 28px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            box-shadow: inset 0 1px 3px #00000033, 0 3px 6px #0000002e;
+        }
+
+        .slot-letter {
+            background: #ecd9c2;
+            width: 44px;
+            height: 52px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #4a2a1a;
+            border-radius: 16px;
+            box-shadow: inset 0 -2px 0 #aa8b6e, 0 2px 5px black;
+            text-transform: uppercase;
+        }
+
+        .slot-letter.filled {
+            background: #b87c4f;
+            color: white;
+            text-shadow: 0 1px 2px black;
+        }
+
+        /* roda de letras */
+        .letter-wheel {
+            background: #f1e2cf;
+            border-radius: 80px;
+            padding: 24px 12px;
+            margin: 12px 0;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.2), inset 0 1px 4px white;
+        }
+
+        .letter-tile {
+            width: 70px;
+            height: 70px;
+            background: #fffaec;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.3rem;
+            font-weight: bold;
+            color: #3a2a1f;
+            text-transform: uppercase;
+            box-shadow: 0 8px 0 #ac8e6e;
+            cursor: pointer;
+            transition: 0.07s linear;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .letter-tile:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #ac8e6e;
+        }
+
+        .selected-area {
+            background: #ecd1aa;
+            border-radius: 56px;
+            min-height: 70px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 12px;
+            font-size: 2rem;
+            letter-spacing: 6px;
+            font-weight: bold;
+            font-family: monospace;
+            color: #3c2a1c;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin: 12px 0;
+        }
+
+        button {
+            background: #3a2c23;
+            border: none;
+            color: #ffefcf;
+            padding: 10px 18px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 0 #1f1610;
+            transition: 0.07s linear;
+            cursor: pointer;
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1f1610;
+        }
+
+        .feedback {
+            background: #00000077;
+            color: #ffefb9;
+            border-radius: 40px;
+            padding: 8px;
+            margin-top: 12px;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 480px) {
+            .letter-tile { width: 60px; height: 60px; font-size: 1.8rem; }
+            .slot-letter { width: 36px; height: 46px; font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameApp">
+    <div class="top-bar">
+        <div class="coins">🪙 <span id="coinCounter">0</span></div>
+        <div class="level-box">Nível <span id="levelNumber">1</span></div>
+    </div>
+
+    <div class="word-slots" id="wordSlotsContainer">
+        <!-- slots dinâmicos -->
+    </div>
+
+    <div class="letter-wheel" id="letterWheel"></div>
+
+    <div class="selected-area" id="selectedWordArea"></div>
+
+    <div class="action-buttons">
+        <button id="submitBtn">✨ ENVIAR</button>
+        <button id="shuffleBtn">🔄 EMBARALHAR</button>
+        <button id="hintBtn">💡 DICA (20 moedas)</button>
+    </div>
+    <div class="feedback" id="feedbackMsg">Arraste ou clique nas letras → forme palavras</div>
+</div>
+
+<script>
+    // ------------------- BANCO DE NÍVEIS (20 curados + infinito) -----------------
+    const FIXED_LEVELS = [
+        { letters: ["S","O","L"], words: ["SOL","LOS"] },
+        { letters: ["L","O","B","O"], words: ["LOBO","BOLO"] },
+        { letters: ["C","A","S","A"], words: ["CASA","SACA"] },
+        { letters: ["T","R","I","L","H","A"], words: ["TRILHA","TILHA","LATIR"] },
+        { letters: ["M","A","R","E"], words: ["MARE","ARME","RAME"] },
+        { letters: ["F","O","G","O"], words: ["FOGO","GOFO"] },
+        { letters: ["P","E","I","X","E"], words: ["PEIXE","PIXE"] },
+        { letters: ["N","U","V","E","M"], words: ["NUVEM","VENUM"] },
+        { letters: ["V","E","N","T","O"], words: ["VENTO","TENVO"] },
+        { letters: ["R","O","S","A"], words: ["ROSA","SARO","AROS"] },
+        { letters: ["L","U","A"], words: ["LUA","UAL"] },
+        { letters: ["M","O","N","T","E"], words: ["MONTE","TOMNE"] },
+        { letters: ["P","R","A","T","A"], words: ["PRATA","TAPAR","PARTA"] },
+        { letters: ["C","E","D","R","O"], words: ["CEDRO","CORDE","DOCE"] },
+        { letters: ["F","L","O","R"], words: ["FLOR","ROLF"] },
+        { letters: ["B","R","I","S","A"], words: ["BRISA","RABIS"] },
+        { letters: ["G","R","I","T","O"], words: ["GRITO","TIGRO"] },
+        { letters: ["C","H","U","V","A"], words: ["CHUVA","VUCHA"] },
+        { letters: ["D","O","C","E"], words: ["DOCE","CEDO"] },
+        { letters: ["P","A","Z"], words: ["PAZ","ZAP"] }
+    ];
+
+    let currentLevel = 1;          // 1-indexado
+    let currentLetters = [];        // array de caracteres
+    let targetWords = [];            // lista de palavras esperadas
+    let foundWords = new Set();       // palavras já descobertas
+    let coins = 100;                 // moedas iniciais
+    let selectedIndices = [];        // índices na roda atualmente selecionados (ordem)
+    let currentDrag = false;
+
+    // DOM elements
+    const wheelDiv = document.getElementById("letterWheel");
+    const slotsContainer = document.getElementById("wordSlotsContainer");
+    const selectedArea = document.getElementById("selectedWordArea");
+    const coinSpan = document.getElementById("coinCounter");
+    const levelSpan = document.getElementById("levelNumber");
+    const feedback = document.getElementById("feedbackMsg");
+
+    // helpers
+    function saveGame() {
+        const save = {
+            currentLevel, currentLetters, targetWords, foundWords: Array.from(foundWords), coins
+        };
+        localStorage.setItem("letrosoCross", JSON.stringify(save));
+    }
+
+    function loadGame() {
+        const raw = localStorage.getItem("letrosoCross");
+        if (!raw) return false;
+        try {
+            const data = JSON.parse(raw);
+            currentLevel = data.currentLevel;
+            currentLetters = data.currentLetters;
+            targetWords = data.targetWords;
+            foundWords = new Set(data.foundWords);
+            coins = data.coins;
+            return true;
+        } catch(e) { return false; }
+    }
+
+    // gerar nível infinito (>=21)
+    function generateInfiniteLevel() {
+        // escolhe 5~7 letras aleatórias consoante+vogal minimamente possível
+        const consoantes = "BCDFGHJKLMNPQRSTVWXYZ".split("");
+        const vogais = "AEIOU".split("");
+        let letters = [];
+        const letterCount = 5 + Math.floor(Math.random() * 4); // 5 a 8 letras
+        let vogalCount = Math.max(2, Math.floor(letterCount / 3));
+        for(let i=0; i<vogalCount; i++) letters.push(vogais[Math.floor(Math.random()*vogais.length)]);
+        while(letters.length < letterCount) letters.push(consoantes[Math.floor(Math.random()*consoantes.length)]);
+        // embaralha
+        for(let i=letters.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[letters[i],letters[j]]=[letters[j],letters[i]];}
+        // para não exigir palavras perfeitas, vamos gerar 2 palavras mock: só para demo
+        // modo infinito: geramos palavras fictícias a partir das letras (para não travar)
+        // melhor: monta palavras curtas possíveis (simplificado)
+        const allWords = generatePossibleWords(letters);
+        const targetWordsInf = allWords.length >=2 ? allWords.slice(0,3) : (allWords.length? allWords : [letters.slice(0,3).join("")]);
+        return { letters, words: targetWordsInf };
+    }
+
+    // gera palavras possíveis pequenas (mock)
+    function generatePossibleWords(lettersArr) {
+        let set= new Set();
+        let str= lettersArr.join("");
+        // apenas para demonstração de mecânica, gera combinações de 3~4 letras
+        for(let i=0;i<lettersArr.length;i++){
+            for(let j=0;j<lettersArr.length;j++){
+                if(j===i) continue;
+                for(let k=0;k<lettersArr.length;k++){
+                    if(k===i||k===j) continue;
+                    let w= lettersArr[i]+lettersArr[j]+lettersArr[k];
+                    set.add(w);
+                }
+            }
+        }
+        return Array.from(set).slice(0,4);
+    }
+
+    // carregar nível (by number)
+    async function loadLevel(levelNum) {
+        foundWords.clear();
+        selectedIndices = [];
+        if(levelNum <= FIXED_LEVELS.length) {
+            const lvl = FIXED_LEVELS[levelNum-1];
+            currentLetters = [...lvl.letters];
+            targetWords = [...lvl.words];
+        } else {
+            const inf = generateInfiniteLevel();
+            currentLetters = inf.letters;
+            targetWords = inf.words;
+        }
+        // embaralhar letras
+        shuffleArray(currentLetters);
+        renderWheel();
+        renderSlots();
+        updateCoinsUI();
+        levelSpan.innerText = levelNum;
+        selectedArea.innerHTML = "";
+        feedback.innerText = `Nível ${levelNum} • Encontre as palavras!`;
+        saveGame();
+    }
+
+    function shuffleArray(arr) {
+        for(let i=arr.length-1;i>0;i--){
+            const j=Math.floor(Math.random()*(i+1));
+            [arr[i],arr[j]]=[arr[j],arr[i]];
+        }
+    }
+
+    function renderWheel() {
+        wheelDiv.innerHTML = "";
+        currentLetters.forEach((letter, idx) => {
+            const tile = document.createElement("div");
+            tile.className = "letter-tile";
+            tile.innerText = letter;
+            tile.setAttribute("data-idx", idx);
+            // eventos para clique e toque
+            tile.addEventListener("click", (e) => {
+                e.stopPropagation();
+                handleLetterClick(idx);
+            });
+            // suporte a drag / toque arrastar
+            tile.addEventListener("touchstart", (e) => { e.preventDefault(); startDrag(idx); });
+            tile.addEventListener("mousedown", (e) => { e.preventDefault(); startDrag(idx); });
+            wheelDiv.appendChild(tile);
+        });
+    }
+
+    function startDrag(idx) {
+        if(selectedIndices.includes(idx)) return;
+        selectedIndices.push(idx);
+        updateSelectedDisplay();
+        renderWheelSelection();
+    }
+
+    function handleLetterClick(idx) {
+        if(selectedIndices.includes(idx)) return;
+        selectedIndices.push(idx);
+        updateSelectedDisplay();
+        renderWheelSelection();
+    }
+
+    function updateSelectedDisplay() {
+        const word = selectedIndices.map(i => currentLetters[i]).join('');
+        selectedArea.innerHTML = word.split('').map(l => `<span style="background:#c7a56b; padding:0 8px; border-radius:20px;">${l}</span>`).join(' ');
+        if(word.length===0) selectedArea.innerHTML = "🔤 toque nas letras";
+    }
+
+    function renderWheelSelection() {
+        // apenas para realce visual dos tiles selecionados
+        const tiles = document.querySelectorAll(".letter-tile");
+        tiles.forEach((tile, idx) => {
+            if(selectedIndices.includes(idx)) {
+                tile.style.background = "#c9a96b";
+                tile.style.transform = "translateY(4px)";
+                tile.style.boxShadow = "0 2px 0 #ac8e6e";
+            } else {
+                tile.style.background = "#fffaec";
+                tile.style.transform = "";
+                tile.style.boxShadow = "0 8px 0 #ac8e6e";
+            }
+        });
+    }
+
+    function renderSlots() {
+        slotsContainer.innerHTML = "";
+        // exibe palavras alvo, cada letra como slot
+        targetWords.forEach(word => {
+            const wordDiv = document.createElement("div");
+            wordDiv.className = "slot-word";
+            for(let i=0;i<word.length;i++) {
+                const slot = document.createElement("div");
+                slot.className = "slot-letter";
+                const letterUpper = word[i];
+                slot.innerText = letterUpper;
+                if(foundWords.has(word.toUpperCase())) {
+                    slot.classList.add("filled");
+                } else {
+                    // se ainda não preenchida, não preenche
+                    if(!foundWords.has(word.toUpperCase())) slot.innerText = "?";
+                }
+                wordDiv.appendChild(slot);
+            }
+            slotsContainer.appendChild(wordDiv);
+        });
+    }
+
+    function submitWord() {
+        if(selectedIndices.length < 3) {
+            feedback.innerText = "❗ Forme palavras com 3 letras ou mais!";
+            return;
+        }
+        const attempt = selectedIndices.map(i => currentLetters[i]).join('');
+        const attemptUpper = attempt.toUpperCase();
+        // verifica se está nas palavras alvo e não foi descoberta
+        const foundTarget = targetWords.find(w => w.toUpperCase() === attemptUpper);
+        if(foundTarget && !foundWords.has(attemptUpper)) {
+            // acertou!
+            foundWords.add(attemptUpper);
+            coins += 10;
+            updateCoinsUI();
+            feedback.innerText = `✅ +10 moedas! "${attemptUpper}" descoberta!`;
+            renderSlots();
+            // limpando seleção
+            selectedIndices = [];
+            updateSelectedDisplay();
+            renderWheelSelection();
+
+            // checar vitória do nível
+            const allFound = targetWords.every(w => foundWords.has(w.toUpperCase()));
+            if(allFound) {
+                feedback.innerText = `🎉 Nível ${currentLevel} completo! +50 moedas! Próximo nível 🎉`;
+                coins += 50;
+                updateCoinsUI();
+                currentLevel++;
+                loadLevel(currentLevel);
+            }
+            saveGame();
+        } else {
+            feedback.innerText = `❌ "${attemptUpper}" não é uma palavra válida ou já foi encontrada.`;
+            // não limpa seleção, só feedback
+        }
+        // limpa seleção após submit ou erro? Melhor manter mas não limpa automaticamente pra não frustrar; porém reset opcional
+        // mas escolhi não limpar automático (jogador pode apagar com shuffle)
+    }
+
+    function shuffleLetters() {
+        shuffleArray(currentLetters);
+        selectedIndices = [];
+        renderWheel();
+        updateSelectedDisplay();
+        renderWheelSelection();
+        feedback.innerText = "Letras embaralhadas!";
+        saveGame();
+    }
+
+    function useHint() {
+        if(coins < 20) {
+            feedback.innerText = "Moedas insuficientes! (20 moedas)";
+            return;
+        }
+        // dica: revela uma letra de uma palavra não encontrada
+        const missingWords = targetWords.filter(w => !foundWords.has(w.toUpperCase()));
+        if(missingWords.length === 0) {
+            feedback.innerText = "Já completou todas! Avance de nível.";
+            return;
+        }
+        const randomMissing = missingWords[Math.floor(Math.random()*missingWords.length)];
+        const wordUpper = randomMissing.toUpperCase();
+        // revela no slot? O slot já mostra "?" se não preenchido. Vamos dar dica textual
+        feedback.innerText = `💡 Dica: uma palavra tem ${randomMissing.length} letras. Exemplo: começa com "${randomMissing[0]}" e termina com "${randomMissing[randomMissing.length-1]}"`;
+        coins -= 20;
+        updateCoinsUI();
+        saveGame();
+    }
+
+    function updateCoinsUI() {
+        coinSpan.innerText = coins;
+    }
+
+    // reinicio de jogo ou carregamento inicial
+    function init() {
+        const loaded = loadGame();
+        if(loaded && currentLetters && currentLetters.length) {
+            renderWheel();
+            renderSlots();
+            updateSelectedDisplay();
+            renderWheelSelection();
+            levelSpan.innerText = currentLevel;
+            updateCoinsUI();
+            feedback.innerText = "Bem vindo de volta!";
+        } else {
+            currentLevel = 1;
+            coins = 100;
+            loadLevel(1);
+        }
+    }
+
+    // eventos botões
+    document.getElementById("submitBtn").addEventListener("click", submitWord);
+    document.getElementById("shuffleBtn").addEventListener("click", shuffleLetters);
+    document.getElementById("hintBtn").addEventListener("click", useHint);
+
+    init();
+</script>
+</body>
+  </html>
